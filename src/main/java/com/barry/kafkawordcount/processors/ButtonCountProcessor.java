@@ -5,12 +5,20 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.function.Function;
 
+import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.kstream.Grouped;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Materialized;
+import org.apache.kafka.streams.kstream.SlidingWindows;
 import org.apache.kafka.streams.kstream.TimeWindows;
+import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.StoreBuilder;
+import org.apache.kafka.streams.state.Stores;
+import org.springframework.cloud.stream.binder.kafka.streams.annotations.KafkaStreamsStateStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -18,16 +26,32 @@ import org.springframework.context.annotation.Configuration;
 public class ButtonCountProcessor {
 
     @Bean
-    public Function<KStream<String, String>,KStream<String, ButtonCount>> process(){
+	public Function<KStream<String, String>,KStream<String, ButtonCount>> process(){
+		// TODO: using in memory Store
+		// check this for not using RocksDB: https://kafka.apache.org/30/javadoc/org/apache/kafka/streams/state/Stores.html
+		// KeyValueStore<String,String> storeSupplier = Stores.keyValueStoreBuilder(Stores.inMemoryKeyValueStore("ButtonsCounts-1"),Serdes.String(),Serdes.String()).build();
+		// KeyValueBytesStoreSupplier storeSupplier = Stores.inMemoryKeyValueStore("ButtonCounts-1");
 
         return input -> input
 					.map((key, value) -> new KeyValue<>(value, value))
 					.groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
-					.windowedBy(TimeWindows.of(Duration.ofMillis(5000)))
-					.count(Materialized.as("ButtonCounts-1"))
+					.windowedBy(TimeWindows.of(Duration.ofMillis(3000)))
+					//.windowedBy(SlidingWindows.withTimeDifferenceAndGrace(Duration.ofMillis(5000),Duration.ofMillis(2000)))
+					// .count(Materialized.as("ButtonCounts-1"))
+					.count(Materialized.as("myStore"))
 					.toStream()
 					.map((key, value) -> new KeyValue<>(null, new ButtonCount(key.key(), value, new Date(key.window().start()), new Date(key.window().end()))));
     }
+
+
+	// https://stackoverflow.com/questions/62467431/is-it-possible-to-use-kafkastreamsstatestore-annotation-on-spring-cloud-stream
+	// https://cloud.spring.io/spring-cloud-static/spring-cloud-stream-binder-kafka/3.0.6.RELEASE/reference/html/spring-cloud-stream-binder-kafka.html#_state_store
+	
+	@Bean
+    public StoreBuilder<KeyValueStore<String,String>> myStore() {
+        return Stores.keyValueStoreBuilder(Stores.inMemoryKeyValueStore("ButtonsCounts-1"),Serdes.String(),Serdes.String());
+    }
+
 
     static class ButtonCount {
 
