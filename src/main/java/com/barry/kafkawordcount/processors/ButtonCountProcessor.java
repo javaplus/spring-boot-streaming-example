@@ -36,9 +36,9 @@ public class ButtonCountProcessor {
 					.map((key, value) -> new KeyValue<>(value, value))
 					.groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
 					.windowedBy(TimeWindows.of(Duration.ofMillis(3000)))
-					//.windowedBy(SlidingWindows.withTimeDifferenceAndGrace(Duration.ofMillis(5000),Duration.ofMillis(2000)))
-					// .count(Materialized.as("ButtonCounts-1"))
-					.count(Materialized.as("myStore"))
+					// .windowedBy(SlidingWindows.withTimeDifferenceAndGrace(Duration.ofMillis(5000),Duration.ofMillis(2000)))
+					.count(Materialized.as("ButtonCounts-1"))
+					//.count(Materialized.)
 					.toStream()
 					.map((key, value) -> new KeyValue<>(null, new ButtonCount(key.key(), value, new Date(key.window().start()), new Date(key.window().end()))));
     }
